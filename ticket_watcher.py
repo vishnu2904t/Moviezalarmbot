@@ -16,6 +16,10 @@ import requests
 
 MOVIE = "avengers"  # lowercase substring matched against titles
 SCREEN_KEYWORDS = []  # e.g. ["audi 3", "luxe", "imax"]; empty = any screen
+# Only alert if the response contains 19 Dec 2026 in any of these formats.
+# Set to [] to disable. Also set the date to 19 Dec in each request body below.
+DATE_PATTERNS = ["2026-12-19", "20261219", "19-12-2026", "19/12/2026",
+                 "19 dec", "dec 19", "19-dec-2026", "19dec"]
 
 # One entry per theatre. Fill url/headers/body from browser DevTools:
 #   open the PVR INOX site -> pick the theatre -> Network tab (Fetch/XHR)
@@ -120,7 +124,12 @@ def save_state(state):
 def check(watch, state):
     if "PASTE_" in watch["url"]:
         return
-    sessions = extract_sessions(fetch(watch))
+    data = fetch(watch)
+    raw = json.dumps(data).lower()
+    if DATE_PATTERNS and not any(p in raw for p in DATE_PATTERNS):
+        print(f"{watch['name']}: 19 Dec not in response yet (or date format differs)")
+        return
+    sessions = extract_sessions(data)
     seen = set(state.get(watch["name"], []))
     new = [k for k in sessions if k not in seen]
     first_run = watch["name"] not in state
