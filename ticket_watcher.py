@@ -24,28 +24,37 @@ DATE_PATTERNS = ["2026-12-19", "20261219", "19-12-2026", "19/12/2026",
 # One entry per theatre. Fill url/headers/body from browser DevTools:
 #   open the PVR INOX site -> pick the theatre -> Network tab (Fetch/XHR)
 #   -> find the request that returns showtimes -> right click -> Copy as cURL.
+PVR_URL = "https://api3.pvrcinemas.com/api/v1/booking/content/csessions"
+PVR_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/plain, */*",
+    "Origin": "https://www.pvrcinemas.com",
+    "Authorization": "Bearer",
+    "chain": "PVR", "city": "Chennai", "country": "INDIA",
+    "platform": "MSITE", "appversion": "1.0",
+}
+TARGET_DATE = "2026-12-19"
+
+# cid 320 = Phoenix Marketcity Velachery. Marina Mall and Palazzo have their
+# own cid values: copy a request for each from the PVR page and add them below.
+def make_watch(name, cid):
+    return {
+        "name": name,
+        "method": "POST",
+        "url": PVR_URL,
+        "headers": PVR_HEADERS,
+        "body": {"city": "Chennai", "cid": cid, "lat": "12.883208",
+                 "lng": "80.3613280", "dated": TARGET_DATE, "qr": "NO",
+                 "cineType": "", "cineTypeQR": ""},
+    }
+
+
 WATCHES = [
-    {
-        "name": "Phoenix Marketcity Velachery (PVR)",
-        "method": "POST",
-        "url": "PASTE_SHOWTIME_URL_HERE",
-        "headers": {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
-        "body": {},  # paste the JSON payload (theatre id, city, date)
-    },
-    {
-        "name": "Marina Mall OMR (INOX)",
-        "method": "POST",
-        "url": "PASTE_SHOWTIME_URL_HERE",
-        "headers": {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
-        "body": {},
-    },
-    {
-        "name": "Palazzo Vadapalani (PVR)",
-        "method": "POST",
-        "url": "PASTE_SHOWTIME_URL_HERE",
-        "headers": {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
-        "body": {},
-    },
+    make_watch("Phoenix Marketcity Velachery (PVR)", "320"),
+    make_watch("Marina Mall OMR (PVR)", "232"),
+    make_watch("Palazzo Vadapalani (PVR)", "388"),
 ]
 
 POLL_SECONDS = (60, 120)  # random interval range, keeps traffic low
@@ -126,10 +135,15 @@ def check(watch, state):
         return
     data = fetch(watch)
     raw = json.dumps(data).lower()
+    sample = json.dumps(data)[:2500]
     if DATE_PATTERNS and not any(p in raw for p in DATE_PATTERNS):
         print(f"{watch['name']}: 19 Dec not in response yet (or date format differs)")
+        print("RESPONSE SAMPLE:", sample)
         return
     sessions = extract_sessions(data)
+    if not sessions:
+        print(f"{watch['name']}: no Avengers sessions found yet")
+        print("RESPONSE SAMPLE:", sample)
     seen = set(state.get(watch["name"], []))
     new = [k for k in sessions if k not in seen]
     first_run = watch["name"] not in state
